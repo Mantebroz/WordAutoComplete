@@ -1,0 +1,710 @@
+eSafeNext,
+false
+)
+end)
+end
+C.ScheduleCurrentRound =
+scheduleCurrentRound
+local function onUpdateTyping(word)
+if type(word)
+~= "string" then
+return
+end
+if isOurTurn()
+or C.AwaitingResult
+or C.RecoveringStrike then
+setRemoteWord(
+word
+)
+print(
+"[REMOTE BUFFER]",
+normalize(
+word
+)
+)
+end
+end
+local function onUpdateStrikes(count)
+count =
+tonumber(count)
+if not count then
+return
+end
+C.StrikeCount =
+math.clamp(
+count,
+0,
+MAX_STRIKES
+)
+updateAttempts()
+end
+local function onStrike(
+struckPlayer,
+strikeNumber,
+alreadyUsed
+)
+if struckPlayer
+and not samePlayer(
+struckPlayer
+) then
+return
+end
+local strike =
+tonumber(
+strikeNumber
+)
+if strike then
+C.StrikeCount =
+math.clamp(
+strike,
+0,
+MAX_STRIKES
+)
+else
+C.StrikeCount =
+math.min(
+MAX_STRIKES,
+(C.StrikeCount or 0)
++ 1
+)
+end
+updateAttempts()
+print("")
+print(
+"========================================"
+)
+print(
+"✗ STRIKE:",
+C.StrikeCount,
+"/",
+MAX_STRIKES
+)
+print(
+"REMAINING:",
+C.AttemptsRemaining
+)
+print(
+"ALREADY USED:",
+alreadyUsed == true
+)
+print(
+"========================================"
+)
+if not C.AwaitingResult
+or not C.PendingWord
+or C.LastSubmittedSerial
+~= C.RoundSerial then
+return
+end
+local rejected =
+normalize(
+C.PendingWord
+)
+local prefix =
+normalize(
+C.LastSubmittedPrefix
+or C.RequiredPrefix
+)
+local serial =
+C.LastSubmittedSerial
+C.TriedWords[
+rejected
+] = true
+if alreadyUsed == true then
+C.UsedWords[
+rejected
+] = true
+setStatus(
+"Ya usada: "
+.. string.upper(
+rejected
+)
+)
+else
+C.DeniedWords[
+rejected
+] = true
+if WordMemory
+and type(WordMemory.markFailed)
+== "function" then
+pcall(
+WordMemory.markFailed,
+rejected
+)
+end
+setStatus(
+"Rechazada: "
+.. string.upper(
+rejected
+)
+.. " • quedan "
+.. tostring(
+C.AttemptsRemaining
+or "?"
+)
+)
+end
+if prefix ~= "" then
+C.SafePrefixes[
+prefix
+] = true
+C.PrefixRejects[
+prefix
+] =
+(
+C.PrefixRejects[
+prefix
+]
+or 0
+)
++ 1
+end
+C.ForceSafeNext =
+true
+updateSafeButton()
+updateStats()
+if C.StrikeCount
+>= MAX_STRIKES then
+C.BlockedRoundSerial =
+C.RoundSerial
+C.AwaitingResult =
+false
+C.PendingWord =
+nil
+C.Busy =
+false
+C.RecoveringStrike =
+false
+setMode(
+"SIN INTENTOS"
+)
+setStatus(
+"5/5 strikes • esperando daño/reset"
+)
+return
+end
+C.AwaitingResult =
+false
+task.spawn(function()
+recoverAfterStrike(
+rejected,
+prefix,
+serial
+)
+end)
+end
+local function onCorrect(
+word,
+...
+)
+word =
+normalize(
+word
+)
+if word ~= "" then
+C.UsedWords[
+word
+] = true
+end
+if C.PendingWord
+and C.LastSubmittedSerial
+== C.RoundSerial then
+local pending =
+normalize(
+C.PendingWord
+)
+C.UsedWords[
+pending
+] = true
+setStatus(
+"✓ CORRECTA: "
+.. string.upper(
+pending
+)
+)
+end
+C.BlockedRoundSerial =
+C.RoundSerial
+C.PendingWord =
+nil
+C.LastSubmittedWord =
+nil
+C.LastSubmittedPrefix =
+nil
+C.LastSubmittedSerial =
+-1
+C.AwaitingResult =
+false
+C.RecoveringStrike =
+false
+C.Busy =
+false
+C.ForceSafeNext =
+false
+updateSafeButton()
+updateStats()
+setMode(
+"ACEPTADA"
+)
+end
+local function onTakeDamage(...)
+C.BlockedRoundSerial =
+C.RoundSerial
+C.PendingWord =
+nil
+C.LastSubmittedWord =
+nil
+C.LastSubmittedPrefix =
+nil
+C.LastSubmittedSerial =
+-1
+C.AwaitingResult =
+false
+C.RecoveringStrike =
+false
+C.Busy =
+false
+setMode(
+"CORAZÓN PERDIDO"
+)
+setStatus(
+"Esperando próximo round"
+)
+end
+local function onUpdateRound(
+roundData,
+_,
+turnPlayer,
+_,
+_,
+strikeCount,
+_
+)
+C.RoundSerial += 1
+C.Busy =
+false
+C.AwaitingResult =
+false
+C.RecoveringStrike =
+false
+C.BlockedRoundSerial =
+-1
+C.PendingWord =
+nil
+C.LastSubmittedWord =
+nil
+C.LastSubmittedPrefix =
+nil
+C.LastSubmittedSerial =
+-1
+C.ExpectedWord =
+""
+C.LastStartedRound =
+-1
+C.LastChoiceRound =
+-1
+C.TurnPlayer =
+turnPlayer
+C.Choices =
+nil
+if tonumber(
+strikeCount
+) then
+C.StrikeCount =
+math.clamp(
+tonumber(
+strikeCount
+),
+0,
+MAX_STRIKES
+)
+updateAttempts()
+end
+if type(roundData)
+== "table" then
+C.RequiredPrefix =
+normalize(
+roundData.RequiredLetter
+or ""
+)
+C.Choices =
+roundData.Choices
+else
+C.RequiredPrefix =
+""
+end
+C.ExpectedWord =
+C.RequiredPrefix
+setPrefix(
+C.RequiredPrefix
+)
+setLocalWord(
+C.RequiredPrefix
+)
+setRemoteWord(
+C.RequiredPrefix
+)
+if C.Choices then
+if samePlayer(
+turnPlayer
+) then
+setStatus(
+"Tu turno • elegir letra"
+)
+else
+setStatus(
+"Otro jugador elige letra"
+)
+end
+elseif samePlayer(
+turnPlayer
+) then
+if C.ForceSafeNext then
+setMode(
+"SAFE preparado"
+)
+setStatus(
+"Tu turno • SAFE MODE"
+)
+else
+setMode(
+"STRATEGY"
+)
+setStatus(
+"Tu turno"
+)
+end
+else
+setStatus(
+"Esperando turno"
+)
+end
+task.defer(function()
+task.wait(0.05)
+scheduleCurrentRound()
+end)
+end
+local function startAuto()
+if C.Enabled then
+return
+end
+C.Enabled =
+true
+if C.ToggleButton then
+C.ToggleButton.Text =
+"AUTO: ON"
+C.ToggleButton.BackgroundColor3 =
+Color3.fromRGB(
+55,
+111,
+72
+)
+end
+setStatus(
+"AUTO activado"
+)
+scheduleCurrentRound()
+end
+local function stopAuto()
+C.Enabled =
+false
+C.Busy =
+false
+if C.ToggleButton then
+C.ToggleButton.Text =
+"AUTO: OFF"
+C.ToggleButton.BackgroundColor3 =
+Color3.fromRGB(
+60,
+60,
+69
+)
+end
+setStatus(
+"AUTO apagado"
+)
+end
+function C:Destroy()
+if self.Destroyed then
+return
+end
+self.Destroyed =
+true
+self.Enabled =
+false
+self.Busy =
+false
+self.AwaitingResult =
+false
+self.RecoveringStrike =
+false
+for _, connection in ipairs(
+self.RbxConnections
+) do
+pcall(function()
+connection:Disconnect()
+end)
+end
+self.RbxConnections =
+{}
+for _, connection in ipairs(
+self.EventConnections
+) do
+pcall(function()
+if type(Event.disconnect)
+== "function" then
+Event.disconnect(
+connection
+)
+elseif typeof(connection)
+== "RBXScriptConnection" then
+connection:Disconnect()
+end
+end)
+end
+self.EventConnections =
+{}
+if self.Gui then
+self.Gui:Destroy()
+self.Gui =
+nil
+end
+if _G.AutoWordMaster
+== self then
+_G.AutoWordMaster =
+nil
+end
+print(
+"✓ AUTO WORD MASTER destroyed"
+)
+end
+local playerGui =
+player:WaitForChild(
+"PlayerGui"
+)
+for _, name in ipairs({
+"AutoWordMasterUI",
+"AutoWordDirectUI",
+"AutoWordStableUI",
+}) do
+local old =
+playerGui:FindFirstChild(
+name
+)
+if old then
+old:Destroy()
+end
+end
+local gui =
+Instance.new(
+"ScreenGui"
+)
+gui.Name =
+"AutoWordMasterUI"
+gui.ResetOnSpawn =
+false
+gui.IgnoreGuiInset =
+false
+gui.DisplayOrder =
+1000
+gui.Parent =
+playerGui
+C.Gui =
+gui
+local frame =
+Instance.new(
+"Frame"
+)
+frame.Name =
+"Main"
+frame.Size =
+UDim2.fromOffset(
+410,
+425
+)
+frame.Position =
+UDim2.fromOffset(
+25,
+110
+)
+frame.BackgroundColor3 =
+Color3.fromRGB(
+23,
+23,
+28
+)
+frame.BorderSizePixel =
+0
+frame.Parent =
+gui
+C.Frame =
+frame
+local frameCorner =
+Instance.new(
+"UICorner"
+)
+frameCorner.CornerRadius =
+UDim.new(
+0,
+12
+)
+frameCorner.Parent =
+frame
+local frameStroke =
+Instance.new(
+"UIStroke"
+)
+frameStroke.Color =
+Color3.fromRGB(
+64,
+64,
+74
+)
+frameStroke.Thickness =
+1
+frameStroke.Parent =
+frame
+local header =
+Instance.new(
+"Frame"
+)
+header.Size =
+UDim2.new(
+1,
+0,
+0,
+50
+)
+header.BackgroundColor3 =
+Color3.fromRGB(
+31,
+31,
+37
+)
+header.BorderSizePixel =
+0
+header.Active =
+true
+header.Parent =
+frame
+local headerCorner =
+Instance.new(
+"UICorner"
+)
+headerCorner.CornerRadius =
+UDim.new(
+0,
+12
+)
+headerCorner.Parent =
+header
+local headerCover =
+Instance.new(
+"Frame"
+)
+headerCover.Size =
+UDim2.new(
+1,
+0,
+0,
+12
+)
+headerCover.Position =
+UDim2.new(
+0,
+0,
+1,
+-12
+)
+headerCover.BackgroundColor3 =
+header.BackgroundColor3
+headerCover.BorderSizePixel =
+0
+headerCover.Parent =
+header
+local title =
+Instance.new(
+"TextLabel"
+)
+title.Size =
+UDim2.new(
+1,
+-100,
+1,
+0
+)
+title.Position =
+UDim2.fromOffset(
+15,
+0
+)
+title.BackgroundTransparency =
+1
+title.Text =
+"AUTO WORD  •  MASTER V3"
+title.TextColor3 =
+Color3.fromRGB(
+245,
+245,
+247
+)
+title.Font =
+Enum.Font.GothamBold
+title.TextSize =
+16
+title.TextXAlignment =
+Enum.TextXAlignment.Left
+title.Parent =
+header
+local minimize =
+Instance.new(
+"TextButton"
+)
+minimize.Size =
+UDim2.fromOffset(
+34,
+30
+)
+minimize.Position =
+UDim2.new(
+1,
+-79,
+0.5,
+-15
+)
+minimize.BackgroundColor3 =
+Color3.fromRGB(
+55,
+55,
+63
+)
+minimize.BorderSizePixel =
+0
+minimize.Text =
+"—"
+minimize.TextColor3 =
+Color3.new(
+1,
+1,
+1
+)
+minimize.Font =
+Enum.Font.GothamBold
+minimize.TextSize =
+16
+minimize.Parent =
+header
+local minCorner =
+Instance.new(
+"UICorner"
+)
+minCorner.CornerRadius =
+UDim.new(
+0,
+7
+)
+minCorner.Parent =
+minimize
+local close =
+Instance.new(
+"TextButto
