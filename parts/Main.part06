@@ -1,0 +1,658 @@
+n"
+)
+close.Size =
+UDim2.fromOffset(
+34,
+30
+)
+close.Position =
+UDim2.new(
+1,
+-40,
+0.5,
+-15
+)
+close.BackgroundColor3 =
+Color3.fromRGB(
+102,
+47,
+50
+)
+close.BorderSizePixel =
+0
+close.Text =
+"X"
+close.TextColor3 =
+Color3.new(
+1,
+1,
+1
+)
+close.Font =
+Enum.Font.GothamBold
+close.TextSize =
+13
+close.Parent =
+header
+local closeCorner =
+Instance.new(
+"UICorner"
+)
+closeCorner.CornerRadius =
+UDim.new(
+0,
+7
+)
+closeCorner.Parent =
+close
+local function makeLabel(
+y,
+height,
+text
+)
+local label =
+Instance.new(
+"TextLabel"
+)
+label.Size =
+UDim2.new(
+1,
+-30,
+0,
+height
+)
+label.Position =
+UDim2.fromOffset(
+15,
+y
+)
+label.BackgroundTransparency =
+1
+label.Text =
+text
+label.TextColor3 =
+Color3.fromRGB(
+214,
+214,
+220
+)
+label.Font =
+Enum.Font.Gotham
+label.TextSize =
+12
+label.TextWrapped =
+true
+label.TextXAlignment =
+Enum.TextXAlignment.Left
+label.TextYAlignment =
+Enum.TextYAlignment.Center
+label.Parent =
+frame
+return label
+end
+C.BankLabel =
+makeLabel(
+57,
+32,
+"BANCO  •  iniciando"
+)
+C.PrefixLabel =
+makeLabel(
+91,
+25,
+"PREFIJO  •  -"
+)
+C.WordLabel =
+makeLabel(
+117,
+35,
+"OBJETIVO  •  -"
+)
+C.LocalLabel =
+makeLabel(
+152,
+26,
+"LOCAL  •  -"
+)
+C.RemoteLabel =
+makeLabel(
+179,
+26,
+"REMOTE  •  -"
+)
+C.ModeLabel =
+makeLabel(
+206,
+30,
+"MODO  •  esperando"
+)
+C.AttemptsLabel =
+makeLabel(
+237,
+28,
+"INTENTOS  •  ? / 5"
+)
+C.StatusLabel =
+makeLabel(
+266,
+44,
+"ESTADO  •  inicializando"
+)
+C.StatsLabel =
+makeLabel(
+310,
+24,
+"Usadas: 0   •   Denegadas: 0"
+)
+local safeButton =
+Instance.new(
+"TextButton"
+)
+safeButton.Size =
+UDim2.new(
+0.38,
+-7,
+0,
+38
+)
+safeButton.Position =
+UDim2.new(
+0,
+15,
+1,
+-76
+)
+safeButton.BackgroundColor3 =
+Color3.fromRGB(
+55,
+55,
+63
+)
+safeButton.BorderSizePixel =
+0
+safeButton.Text =
+"SAFE NEXT: OFF"
+safeButton.TextColor3 =
+Color3.fromRGB(
+245,
+245,
+245
+)
+safeButton.Font =
+Enum.Font.GothamBold
+safeButton.TextSize =
+11
+safeButton.Parent =
+frame
+C.SafeButton =
+safeButton
+local safeCorner =
+Instance.new(
+"UICorner"
+)
+safeCorner.CornerRadius =
+UDim.new(
+0,
+8
+)
+safeCorner.Parent =
+safeButton
+local toggle =
+Instance.new(
+"TextButton"
+)
+toggle.Size =
+UDim2.new(
+0.62,
+-23,
+0,
+38
+)
+toggle.Position =
+UDim2.new(
+0.38,
+7,
+1,
+-76
+)
+toggle.BackgroundColor3 =
+Color3.fromRGB(
+60,
+60,
+69
+)
+toggle.BorderSizePixel =
+0
+toggle.Text =
+"AUTO: OFF"
+toggle.TextColor3 =
+Color3.fromRGB(
+250,
+250,
+250
+)
+toggle.Font =
+Enum.Font.GothamBold
+toggle.TextSize =
+14
+toggle.Parent =
+frame
+C.ToggleButton =
+toggle
+local toggleCorner =
+Instance.new(
+"UICorner"
+)
+toggleCorner.CornerRadius =
+UDim.new(
+0,
+8
+)
+toggleCorner.Parent =
+toggle
+local footer =
+Instance.new(
+"TextLabel"
+)
+footer.Size =
+UDim2.new(
+1,
+-30,
+0,
+24
+)
+footer.Position =
+UDim2.new(
+0,
+15,
+1,
+-31
+)
+footer.BackgroundTransparency =
+1
+footer.Text =
+"tryKeystroke • strike recovery • real bank first"
+footer.TextColor3 =
+Color3.fromRGB(
+125,
+125,
+138
+)
+footer.Font =
+Enum.Font.Gotham
+footer.TextSize =
+10
+footer.TextXAlignment =
+Enum.TextXAlignment.Left
+footer.Parent =
+frame
+local mini =
+Instance.new(
+"TextButton"
+)
+mini.Size =
+UDim2.fromOffset(
+112,
+44
+)
+mini.Position =
+UDim2.fromOffset(
+25,
+110
+)
+mini.BackgroundColor3 =
+Color3.fromRGB(
+31,
+31,
+37
+)
+mini.BorderSizePixel =
+0
+mini.Text =
+"AUTO WORD"
+mini.TextColor3 =
+Color3.fromRGB(
+245,
+245,
+245
+)
+mini.Font =
+Enum.Font.GothamBold
+mini.TextSize =
+12
+mini.Visible =
+false
+mini.Parent =
+gui
+local miniCorner =
+Instance.new(
+"UICorner"
+)
+miniCorner.CornerRadius =
+UDim.new(
+0,
+10
+)
+miniCorner.Parent =
+mini
+trackRbx(
+toggle.MouseButton1Click:Connect(
+function()
+if C.Enabled then
+stopAuto()
+else
+startAuto()
+end
+end
+)
+)
+trackRbx(
+safeButton.MouseButton1Click:Connect(
+function()
+C.ForceSafeNext =
+not C.ForceSafeNext
+updateSafeButton()
+if C.ForceSafeNext then
+setMode(
+"SAFE manual"
+)
+else
+setMode(
+"STRATEGY"
+)
+end
+end
+)
+)
+trackRbx(
+minimize.MouseButton1Click:Connect(
+function()
+mini.Position =
+UDim2.fromOffset(
+frame.AbsolutePosition.X,
+frame.AbsolutePosition.Y
+)
+frame.Visible =
+false
+mini.Visible =
+true
+end
+)
+)
+trackRbx(
+mini.MouseButton1Click:Connect(
+function()
+frame.Position =
+UDim2.fromOffset(
+mini.AbsolutePosition.X,
+mini.AbsolutePosition.Y
+)
+frame.Visible =
+true
+mini.Visible =
+false
+end
+)
+)
+trackRbx(
+close.MouseButton1Click:Connect(
+function()
+C:Destroy()
+end
+)
+)
+local function makeDraggable(
+handle,
+target
+)
+local dragging =
+false
+local dragInput =
+nil
+local dragStart =
+nil
+local startPosition =
+nil
+local function clampPosition(
+x,
+y
+)
+local camera =
+Workspace.CurrentCamera
+if not camera then
+return x, y
+end
+local viewport =
+camera.ViewportSize
+local size =
+target.AbsoluteSize
+return
+math.clamp(
+x,
+0,
+math.max(
+0,
+viewport.X
+- size.X
+)
+),
+math.clamp(
+y,
+0,
+math.max(
+0,
+viewport.Y
+- size.Y
+)
+)
+end
+trackRbx(
+handle.InputBegan:Connect(
+function(input)
+if input.UserInputType
+== Enum.UserInputType.MouseButton1
+or input.UserInputType
+== Enum.UserInputType.Touch then
+dragging =
+true
+dragStart =
+input.Position
+startPosition =
+target.AbsolutePosition
+end
+end
+)
+)
+trackRbx(
+handle.InputChanged:Connect(
+function(input)
+if input.UserInputType
+== Enum.UserInputType.MouseMovement
+or input.UserInputType
+== Enum.UserInputType.Touch then
+dragInput =
+input
+end
+end
+)
+)
+trackRbx(
+UserInputService.InputChanged:Connect(
+function(input)
+if not dragging
+or input ~= dragInput
+or not dragStart
+or not startPosition then
+return
+end
+local delta =
+input.Position
+- dragStart
+local x =
+startPosition.X
++ delta.X
+local y =
+startPosition.Y
++ delta.Y
+x, y =
+clampPosition(
+x,
+y
+)
+target.Position =
+UDim2.fromOffset(
+x,
+y
+)
+end
+)
+)
+trackRbx(
+UserInputService.InputEnded:Connect(
+function(input)
+if input.UserInputType
+== Enum.UserInputType.MouseButton1
+or input.UserInputType
+== Enum.UserInputType.Touch then
+dragging =
+false
+dragInput =
+nil
+end
+end
+)
+)
+end
+makeDraggable(
+header,
+frame
+)
+makeDraggable(
+mini,
+mini
+)
+trackEvent(
+Event.remoteConnect(
+"updateRound",
+onUpdateRound
+)
+)
+trackEvent(
+Event.remoteConnect(
+"updateTyping",
+onUpdateTyping
+)
+)
+trackEvent(
+Event.remoteConnect(
+"strike",
+onStrike
+)
+)
+trackEvent(
+Event.remoteConnect(
+"updateStrikes",
+onUpdateStrikes
+)
+)
+trackEvent(
+Event.remoteConnect(
+"correct",
+onCorrect
+)
+)
+trackEvent(
+Event.remoteConnect(
+"takeDamage",
+onTakeDamage
+)
+)
+trackRbx(
+player:GetAttributeChangedSignal(
+"IsTurn"
+):Connect(
+function()
+if C.Destroyed
+or not C.Enabled then
+return
+end
+if player:GetAttribute(
+"IsTurn"
+) ~= true then
+return
+end
+task.defer(
+scheduleCurrentRound
+)
+end
+)
+)
+task.spawn(function()
+setStatus(
+"Cargando sistema..."
+)
+loadRealBank()
+task.spawn(
+loadCommonDictionary
+)
+updateSafeButton()
+updateAttempts()
+updateStats()
+updateBankLabel()
+setMode(
+C.Bank
+and "REAL BANK prioritario"
+or "COMMON conservador"
+)
+setStatus(
+"OFF • listo"
+)
+print("")
+print(
+"============================================"
+)
+print(
+" AUTO WORD MASTER V3 READY"
+)
+print(
+"============================================"
+)
+print(
+"✓ tryKeystroke oficial"
+)
+print(
+"✓ u4/u5 sincronizados"
+)
+print(
+"✓ strike 1-4 = recovery inmediato"
+)
+print(
+"✓ strike 5 = esperar damage/reset"
+)
+print(
+"✓ backspace oficial"
+)
+print(
+"✓ REAL BANK primero"
+)
+print(
+"✓ XML / LLC externos filtrados"
+)
+print(
+"✓ SAFE después de rechazo"
+)
+print(
+"✓ Choice automático"
+)
+print(
+"✓ UI draggable"
+)
+print(
+WordMemory
+and "✓ blacklist + X bank integrados"
+or "⚠ WordMemory no disponible"
+)
+print(
+"============================================"
+)
+end)
