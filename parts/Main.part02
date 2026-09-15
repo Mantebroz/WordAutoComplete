@@ -1,0 +1,664 @@
+true
+end
+local function setStatus(text)
+print(
+"[AUTO WORD]",
+tostring(text)
+)
+if C.StatusLabel then
+C.StatusLabel.Text =
+"ESTADO  •  "
+.. tostring(text)
+end
+end
+local function setPrefix(prefix)
+if C.PrefixLabel then
+C.PrefixLabel.Text =
+"PREFIJO  •  "
+.. (
+prefix
+and prefix ~= ""
+and string.upper(
+tostring(prefix)
+)
+or "-"
+)
+end
+end
+local function setWord(text)
+if C.WordLabel then
+C.WordLabel.Text =
+"OBJETIVO  •  "
+.. tostring(
+text or "-"
+)
+end
+end
+local function setLocalWord(text)
+if C.LocalLabel then
+C.LocalLabel.Text =
+"LOCAL  •  "
+.. (
+text
+and text ~= ""
+and string.upper(
+tostring(text)
+)
+or "-"
+)
+end
+end
+local function setRemoteWord(text)
+C.ServerWord =
+normalize(
+text or ""
+)
+if C.RemoteLabel then
+C.RemoteLabel.Text =
+"REMOTE  •  "
+.. (
+C.ServerWord ~= ""
+and string.upper(
+C.ServerWord
+)
+or "-"
+)
+end
+end
+local function setMode(text)
+if C.ModeLabel then
+C.ModeLabel.Text =
+"MODO  •  "
+.. tostring(
+text or "-"
+)
+end
+end
+local function updateAttempts()
+if C.StrikeCount ~= nil then
+C.AttemptsRemaining =
+math.max(
+0,
+MAX_STRIKES
+- C.StrikeCount
+)
+else
+C.AttemptsRemaining =
+nil
+end
+if C.AttemptsLabel then
+if C.AttemptsRemaining == nil then
+C.AttemptsLabel.Text =
+"INTENTOS  •  ? / "
+.. tostring(
+MAX_STRIKES
+)
+else
+C.AttemptsLabel.Text =
+"INTENTOS  •  "
+.. tostring(
+C.AttemptsRemaining
+)
+.. " / "
+.. tostring(
+MAX_STRIKES
+)
+end
+end
+end
+local function updateStats()
+if not C.StatsLabel then
+return
+end
+C.StatsLabel.Text =
+"Usadas: "
+.. tostring(
+tableCount(
+C.UsedWords
+)
+)
+.. "   •   Denegadas: "
+.. tostring(
+tableCount(
+C.DeniedWords
+)
+)
+end
+local function updateSafeButton()
+if not C.SafeButton then
+return
+end
+if C.ForceSafeNext then
+C.SafeButton.Text =
+"SAFE NEXT: ON"
+C.SafeButton.BackgroundColor3 =
+Color3.fromRGB(
+57,
+105,
+73
+)
+else
+C.SafeButton.Text =
+"SAFE NEXT: OFF"
+C.SafeButton.BackgroundColor3 =
+Color3.fromRGB(
+55,
+55,
+63
+)
+end
+end
+local function updateBankLabel()
+if not C.BankLabel then
+return
+end
+local parts = {}
+if C.Bank then
+table.insert(
+parts,
+"REAL BANK"
+)
+else
+table.insert(
+parts,
+"BANK NO EXPUESTO"
+)
+end
+if C.CommonReady then
+table.insert(
+parts,
+tostring(
+#C.CommonWords
+)
+.. " comunes"
+)
+elseif C.CommonLoading then
+table.insert(
+parts,
+"comunes cargando"
+)
+end
+if C.HugeReady then
+table.insert(
+parts,
+tostring(
+#C.HugeWords
+)
+.. " fallback"
+)
+elseif C.HugeLoading then
+table.insert(
+parts,
+"fallback cargando"
+)
+end
+C.BankLabel.Text =
+"BANCO  •  "
+.. table.concat(
+parts,
+" + "
+)
+end
+local function trackRbx(connection)
+if connection then
+table.insert(
+C.RbxConnections,
+connection
+)
+end
+return connection
+end
+local function trackEvent(connection)
+if connection then
+table.insert(
+C.EventConnections,
+connection
+)
+end
+return connection
+end
+local function readDisplayedWord()
+local playerGui =
+player:FindFirstChild(
+"PlayerGui"
+)
+if not playerGui then
+return nil
+end
+local best = nil
+for _, keys in ipairs(
+playerGui:GetDescendants()
+) do
+if keys.Name ~= "Keys" then
+continue
+end
+local answerInput =
+keys.Parent
+if not answerInput then
+continue
+end
+if not answerInput:FindFirstChild(
+"BlinkingInput"
+) then
+continue
+end
+local letters = {}
+for _, child in ipairs(
+keys:GetChildren()
+) do
+local index =
+tonumber(
+child.Name
+)
+if index then
+local inner =
+child:FindFirstChild(
+"Inner"
+)
+local label =
+inner
+and inner:FindFirstChildWhichIsA(
+"TextLabel",
+true
+)
+if not label then
+label =
+child:FindFirstChildWhichIsA(
+"TextLabel",
+true
+)
+end
+if label
+and label.Text ~= "" then
+letters[index] =
+label.Text
+end
+end
+end
+local result = {}
+local i = 1
+while letters[i] do
+table.insert(
+result,
+letters[i]
+)
+i += 1
+end
+local word =
+normalize(
+table.concat(
+result
+)
+)
+if word ~= ""
+and (
+not best
+or #word > #best
+) then
+best =
+word
+end
+end
+return best
+end
+local function sendGameKey(key)
+if C.Destroyed then
+return false
+end
+local ok, err =
+pcall(function()
+Event.fire(
+"tryKeystroke",
+key
+)
+end)
+if not ok then
+warn(
+"[AUTO WORD] tryKeystroke:",
+err
+)
+return false
+end
+return true
+end
+local function submitGameAnswer()
+local ok, err =
+pcall(function()
+Event.fire(
+"tryAnswer"
+)
+end)
+if not ok then
+warn(
+"[AUTO WORD] tryAnswer:",
+err
+)
+return false
+end
+return true
+end
+local function chooseGameLetter(letter)
+local ok, err =
+pcall(function()
+Event.remoteFire(
+"chooseLetter",
+string.lower(
+letter
+)
+)
+end)
+if not ok then
+warn(
+"[AUTO WORD] chooseLetter:",
+err
+)
+return false
+end
+return true
+end
+local function wordExistsInEnglish(node)
+if type(node)
+~= "table" then
+return false
+end
+if node["$"] ~= 1 then
+return false
+end
+local languages =
+node.l
+if type(languages)
+== "number" then
+return languages == 0
+end
+if type(languages)
+== "table" then
+for _, language in ipairs(
+languages
+) do
+if tonumber(language)
+== 0 then
+return true
+end
+end
+end
+return false
+end
+local function loadRealBank()
+local bank =
+importGameModule(
+"bank",
+3
+)
+if bank
+and type(bank)
+== "table"
+and type(
+bank.getNodes
+) == "function" then
+C.Bank = bank
+print(
+"✓ REAL GAME BANK loaded"
+)
+updateBankLabel()
+return bank
+end
+C.Bank = nil
+updateBankLabel()
+return nil
+end
+local function childLetter(child)
+if type(child)
+~= "table" then
+return nil
+end
+local n =
+child.n
+if type(n)
+~= "table" then
+return nil
+end
+local letter =
+n[1]
+if type(letter)
+~= "string" then
+return nil
+end
+return normalize(
+letter
+)
+end
+local function bankContainsWord(word)
+if not C.Bank then
+return false
+end
+word =
+normalize(word)
+local ok, nodes =
+pcall(function()
+return C.Bank:getNodes(
+word
+)
+end)
+if not ok
+or type(nodes)
+~= "table" then
+return false
+end
+for _, node in ipairs(nodes) do
+if wordExistsInEnglish(
+node
+) then
+return true
+end
+end
+return false
+end
+local function collectBankCandidates(
+prefix,
+limit
+)
+local results = {}
+if not C.Bank then
+return results
+end
+prefix =
+normalize(prefix)
+local ok, nodes =
+pcall(function()
+return C.Bank:getNodes(
+prefix
+)
+end)
+if not ok
+or type(nodes)
+~= "table" then
+return results
+end
+local queue = {}
+local index = 1
+local searched = 0
+for _, node in ipairs(nodes) do
+table.insert(
+queue,
+{
+Node = node,
+Word = prefix
+}
+)
+end
+while index
+<= #queue do
+searched += 1
+if searched
+> MAX_BANK_NODES then
+break
+end
+local item =
+queue[index]
+index += 1
+local node =
+item.Node
+local word =
+normalize(
+item.Word
+)
+if #word > #prefix
+and bankWordLooksOkay(
+word
+)
+and wordExistsInEnglish(
+node
+)
+and not C.TriedWords[
+word
+]
+and not C.UsedWords[
+word
+]
+and not C.DeniedWords[
+word
+]
+and not memoryBlacklisted(
+word
+) then
+table.insert(
+results,
+word
+)
+if #results
+>= limit then
+break
+end
+end
+if #word
+< MAX_WORD_LENGTH then
+local children =
+node.n
+if type(children)
+== "table" then
+for childIndex = 2,
+#children do
+local child =
+children[
+childIndex
+]
+local letter =
+childLetter(
+child
+)
+if letter
+and letter:match(
+"^[a-z]$"
+) then
+table.insert(
+queue,
+{
+Node = child,
+Word =
+word
+.. letter
+}
+)
+end
+end
+end
+end
+end
+return results
+end
+local function findNormalBankWord(prefix)
+local candidates =
+collectBankCandidates(
+prefix,
+1
+)
+return candidates[1]
+end
+local function countBankContinuations(prefix)
+prefix =
+normalize(prefix)
+if prefix == "" then
+return CONTINUATION_CAP
+end
+if C.BankCountCache[
+prefix
+] ~= nil then
+return C.BankCountCache[
+prefix
+]
+end
+if not C.Bank then
+return CONTINUATION_CAP
+end
+local ok, nodes =
+pcall(function()
+return C.Bank:getNodes(
+prefix
+)
+end)
+if not ok
+or type(nodes)
+~= "table" then
+C.BankCountCache[
+prefix
+] = 0
+return 0
+end
+local queue = {}
+local index = 1
+local searched = 0
+local count = 0
+for _, node in ipairs(nodes) do
+table.insert(
+queue,
+node
+)
+end
+while index
+<= #queue do
+searched += 1
+if searched
+> MAX_BANK_NODES then
+break
+end
+local node =
+queue[index]
+index += 1
+if wordExistsInEnglish(
+node
+) then
+count += 1
+if count
+>= CONTINUATION_CAP then
+count =
+CONTINUATION_CAP
+break
+end
+end
+if type(node)
+== "table" then
+local children =
+node.n
+if type(children)
+== "table" then
+for i = 2,
+#children do
+table.insert(
+queue,
+children[i]
+)
+end
+end
+end
+end
+C.BankCountCache[
+prefix
+] = count
+return count
+end
+local function scarcityScore(count)
+if count <= 0 then
+return 110
+elseif count <= 2 then
+return 95
+elseif count <= 5
