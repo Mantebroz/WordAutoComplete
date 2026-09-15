@@ -1,0 +1,563 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer
+local RNG = Random.new()
+local WordMemory = nil
+do
+local ok, result =
+pcall(function()
+local url =
+"https://raw.githubusercontent.com/"
+.. "Mantebroz/WordAutoComplete/main/WordMemory.lua"
+local source =
+game:HttpGet(
+url,
+true
+)
+local compiler =
+loadstring or load
+if type(compiler)
+~= "function" then
+error(
+"loadstring/load no disponible"
+)
+end
+local chunk, compileError =
+compiler(
+source,
+"WordMemory.lua"
+)
+if not chunk then
+error(compileError)
+end
+return chunk()
+end)
+if ok
+and type(result)
+== "table" then
+WordMemory = result
+print(
+"✓ WordMemory integrado"
+)
+else
+warn(
+"[AUTO WORD] WordMemory no disponible:",
+result
+)
+end
+end
+local START_DELAY_MIN = 0.055
+local START_DELAY_MAX = 0.105
+local RETRY_START_DELAY_MIN = 0.025
+local RETRY_START_DELAY_MAX = 0.055
+local MIN_KEY_DELAY = 0.038
+local MAX_KEY_DELAY = 0.072
+local MIN_SUBMIT_DELAY = 0.085
+local MAX_SUBMIT_DELAY = 0.150
+local MIN_CLEAR_DELAY = 0.035
+local MAX_CLEAR_DELAY = 0.060
+local CLEAR_SETTLE_DELAY = 0.085
+local MAX_STRIKES = 5
+local MAX_WORD_LENGTH = 26
+local MAX_BANK_NODES = 60000
+local BANK_STRATEGY_CANDIDATES = 140
+local COMMON_STRATEGY_CANDIDATES = 180
+local CONTINUATION_CAP = 180
+local DICTIONARY_YIELD_EVERY = 2500
+local EXTERNAL_DENY = {
+xml = true,
+llc = true,
+html = true,
+xhtml = true,
+css = true,
+php = true,
+sql = true,
+json = true,
+http = true,
+https = true,
+url = true,
+www = true,
+api = true,
+png = true,
+jpg = true,
+jpeg = true,
+gif = true,
+pdf = true,
+cpu = true,
+gpu = true,
+ram = true,
+usb = true,
+dvd = true,
+ios = true,
+}
+local SAFE_SEEDS = {
+"apple",
+"animal",
+"answer",
+"around",
+"baby",
+"banana",
+"basket",
+"bird",
+"blue",
+"book",
+"bread",
+"camera",
+"candy",
+"cat",
+"chair",
+"cloud",
+"cold",
+"dance",
+"dark",
+"day",
+"dog",
+"dream",
+"earth",
+"easy",
+"eat",
+"face",
+"family",
+"fast",
+"fish",
+"flower",
+"food",
+"game",
+"garden",
+"green",
+"happy",
+"heart",
+"home",
+"house",
+"ice",
+"idea",
+"jacket",
+"jelly",
+"joke",
+"jump",
+"keep",
+"kind",
+"king",
+"kite",
+"lake",
+"laugh",
+"light",
+"love",
+"magic",
+"moon",
+"music",
+"night",
+"number",
+"orange",
+"paper",
+"party",
+"people",
+"plant",
+"quail",
+"queen",
+"quick",
+"quiet",
+"quilt",
+"quiz",
+"rain",
+"river",
+"road",
+"school",
+"simple",
+"sky",
+"smile",
+"snow",
+"star",
+"sun",
+"table",
+"tree",
+"under",
+"valid",
+"value",
+"very",
+"view",
+"visit",
+"water",
+"white",
+"world",
+"xray",
+"xenon",
+"xylophone",
+"year",
+"yellow",
+"young",
+"yield",
+"zebra",
+"zero",
+"zinc",
+"zipper",
+"zone",
+"zoo",
+}
+local HARD_ENDING_SCORE = {
+x = 145,
+q = 135,
+z = 120,
+j = 95,
+v = 70,
+k = 55,
+w = 45,
+y = 36,
+f = 24,
+g = 14,
+}
+local EASY_ENDING_SCORE = {
+e = -25,
+a = -22,
+s = -20,
+r = -18,
+n = -17,
+t = -15,
+l = -12,
+i = -10,
+o = -10,
+}
+local function startDelay(retry)
+if retry then
+return RNG:NextNumber(
+RETRY_START_DELAY_MIN,
+RETRY_START_DELAY_MAX
+)
+end
+return RNG:NextNumber(
+START_DELAY_MIN,
+START_DELAY_MAX
+)
+end
+local function keyDelay()
+return RNG:NextNumber(
+MIN_KEY_DELAY,
+MAX_KEY_DELAY
+)
+end
+local function submitDelay()
+return RNG:NextNumber(
+MIN_SUBMIT_DELAY,
+MAX_SUBMIT_DELAY
+)
+end
+local function clearDelay()
+return RNG:NextNumber(
+MIN_CLEAR_DELAY,
+MAX_CLEAR_DELAY
+)
+end
+if _G.AutoWordMaster
+and _G.AutoWordMaster.Destroy then
+pcall(function()
+_G.AutoWordMaster:Destroy()
+end)
+end
+if _G.AutoWordDirect
+and _G.AutoWordDirect.Destroy then
+pcall(function()
+_G.AutoWordDirect:Destroy()
+end)
+end
+local function importGameModule(
+name,
+timeout
+)
+local deadline =
+os.clock()
++ (timeout or 15)
+repeat
+if type(_G.import)
+== "function" then
+local ok, result =
+pcall(function()
+return _G.import(name)
+end)
+if ok
+and result then
+return result
+end
+end
+task.wait(0.10)
+until os.clock()
+>= deadline
+return nil
+end
+local function loadEventModule()
+local services =
+ReplicatedStorage:FindFirstChild(
+"Services"
+)
+local communication =
+services
+and services:FindFirstChild(
+"Communication"
+)
+local eventModule =
+communication
+and communication:FindFirstChild(
+"event"
+)
+if eventModule
+and eventModule:IsA(
+"ModuleScript"
+) then
+local ok, result =
+pcall(
+require,
+eventModule
+)
+if ok
+and type(result)
+== "table"
+and type(
+result.fire
+) == "function" then
+print(
+"✓ EVENT MODULE:",
+eventModule:GetFullName()
+)
+return result
+end
+warn(
+"[AUTO WORD] Falló require directo:",
+result
+)
+end
+for _, object in ipairs(
+ReplicatedStorage:GetDescendants()
+) do
+if object:IsA(
+"ModuleScript"
+)
+and string.lower(
+object.Name
+) == "event" then
+local ok, result =
+pcall(
+require,
+object
+)
+if ok
+and type(result)
+== "table"
+and type(
+result.fire
+) == "function" then
+print(
+"✓ EVENT MODULE fallback:",
+object:GetFullName()
+)
+return result
+end
+end
+end
+return nil
+end
+local Event =
+loadEventModule()
+if not Event then
+error(
+"[AUTO WORD] No encontré/cargué el módulo event."
+)
+end
+print(
+"✓ Event.fire:",
+type(Event.fire)
+)
+print(
+"✓ Event.remoteFire:",
+type(Event.remoteFire)
+)
+print(
+"✓ Event.remoteConnect:",
+type(Event.remoteConnect)
+)
+if type(Event.fire) ~= "function"
+or type(Event.remoteConnect) ~= "function" then
+error(
+"[AUTO WORD] El módulo event no tiene la API esperada."
+)
+end
+local C = {
+Enabled = false,
+Destroyed = false,
+Busy = false,
+AwaitingResult = false,
+RecoveringStrike = false,
+RoundSerial = 0,
+TurnPlayer = nil,
+RequiredPrefix = "",
+Choices = nil,
+LastStartedRound = -1,
+LastChoiceRound = -1,
+BlockedRoundSerial = -1,
+StrikeCount = nil,
+AttemptsRemaining = nil,
+PendingWord = nil,
+LastSubmittedWord = nil,
+LastSubmittedPrefix = nil,
+LastSubmittedSerial = -1,
+ExpectedWord = "",
+ServerWord = "",
+ForceSafeNext = false,
+SafePrefixes = {},
+PrefixRejects = {},
+TriedWords = {},
+UsedWords = {},
+DeniedWords = {},
+Bank = nil,
+BankCountCache = {},
+CommonWords = {},
+CommonSeen = {},
+CommonRank = {},
+CommonBuckets1 = {},
+CommonBuckets2 = {},
+CommonReady = false,
+CommonLoading = false,
+HugeWords = {},
+HugeSeen = {},
+HugeBuckets1 = {},
+HugeBuckets2 = {},
+HugeReady = false,
+HugeLoading = false,
+RbxConnections = {},
+EventConnections = {},
+Gui = nil,
+Frame = nil,
+BankLabel = nil,
+PrefixLabel = nil,
+WordLabel = nil,
+LocalLabel = nil,
+RemoteLabel = nil,
+ModeLabel = nil,
+AttemptsLabel = nil,
+StatusLabel = nil,
+StatsLabel = nil,
+ToggleButton = nil,
+SafeButton = nil,
+ScheduleCurrentRound = nil,
+}
+_G.AutoWordMaster = C
+local function normalize(text)
+if type(text)
+~= "string" then
+return ""
+end
+return string.lower(
+text
+:gsub("^%s+", "")
+:gsub("%s+$", "")
+)
+end
+local function memoryBlacklisted(word)
+if not WordMemory
+or type(WordMemory.isBlacklisted)
+~= "function" then
+return false
+end
+local ok, result =
+pcall(
+WordMemory.isBlacklisted,
+word
+)
+return ok
+and result == true
+end
+local function startsWith(
+word,
+prefix
+)
+if type(word) ~= "string"
+or type(prefix) ~= "string" then
+return false
+end
+return word:sub(
+1,
+#prefix
+) == prefix
+end
+local function tableCount(tbl)
+local result = 0
+for _ in pairs(tbl) do
+result += 1
+end
+return result
+end
+local function bankWordLooksOkay(word)
+word =
+normalize(word)
+if word == "" then
+return false
+end
+if #word < 2
+or #word > MAX_WORD_LENGTH then
+return false
+end
+if not word:match(
+"^[a-z]+$"
+) then
+return false
+end
+return true
+end
+local function externalWordLooksOkay(word)
+word =
+normalize(word)
+if word == "" then
+return false
+end
+if #word < 4
+or #word > MAX_WORD_LENGTH then
+return false
+end
+if not word:match(
+"^[a-z]+$"
+) then
+return false
+end
+if EXTERNAL_DENY[
+word
+] then
+return false
+end
+if not word:find(
+"[aeiouy]"
+) then
+return false
+end
+return true
+end
+local function samePlayer(value)
+if value == player then
+return true
+end
+if typeof(value)
+== "Instance"
+and value:IsA(
+"Player"
+) then
+return value.UserId
+== player.UserId
+end
+if tonumber(value)
+== player.UserId then
+return true
+end
+if tostring(value)
+== player.Name then
+return true
+end
+return false
+end
+local function isOurTurn()
+if samePlayer(
+C.TurnPlayer
+) then
+return true
+end
+return player:GetAttribute(
+"IsTurn"
+) == true
