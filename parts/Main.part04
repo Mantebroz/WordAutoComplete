@@ -1,0 +1,723 @@
+malBankWord(
+prefix
+)
+if normal then
+return normal,
+"REAL BANK",
+0,
+false
+end
+end
+local common,
+score =
+findStrategicCommonWord(
+prefix
+)
+if common then
+return common,
+"COMMON • STRATEGY",
+score,
+false
+end
+common =
+findNormalCommonWord(
+prefix
+)
+if common then
+return common,
+"COMMON",
+0,
+false
+end
+local huge =
+findHugeFallback(
+prefix
+)
+if huge then
+return huge,
+"FALLBACK",
+0,
+false
+end
+return nil,
+nil,
+nil,
+false
+end
+local function answerPrefix(
+originalPrefix,
+serial,
+forceSafe,
+retry
+)
+if C.Destroyed
+or not C.Enabled
+or C.Busy
+or C.AwaitingResult
+or C.RecoveringStrike then
+return
+end
+if serial
+~= C.RoundSerial then
+return
+end
+if C.BlockedRoundSerial
+== serial then
+return
+end
+if not isOurTurn() then
+return
+end
+C.Busy =
+true
+task.wait(
+startDelay(
+retry
+)
+)
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or C.BlockedRoundSerial
+== serial
+or not isOurTurn() then
+C.Busy =
+false
+return
+end
+local required =
+normalize(
+originalPrefix
+)
+if required == "" then
+C.Busy =
+false
+return
+end
+local displayed =
+readDisplayedWord()
+local searchPrefix =
+required
+if displayed
+and displayed ~= ""
+and startsWith(
+displayed,
+required
+) then
+searchPrefix =
+displayed
+end
+local word,
+source,
+difficulty,
+safe =
+chooseWord(
+searchPrefix,
+forceSafe
+)
+if not word
+and searchPrefix
+~= required then
+local extra =
+#searchPrefix
+- #required
+for _ = 1,
+extra + 2 do
+if serial
+~= C.RoundSerial
+or not isOurTurn() then
+C.Busy =
+false
+return
+end
+sendGameKey(-1)
+task.wait(
+clearDelay()
+)
+end
+searchPrefix =
+required
+word,
+source,
+difficulty,
+safe =
+chooseWord(
+searchPrefix,
+forceSafe
+)
+end
+if not word then
+C.Busy =
+false
+if not C.HugeReady
+and not C.HugeLoading then
+setStatus(
+"Buscando fallback para "
+.. string.upper(
+required
+)
+)
+C.LastStartedRound =
+-1
+task.spawn(
+loadHugeDictionary
+)
+else
+setStatus(
+"Sin palabra para "
+.. string.upper(
+required
+)
+)
+end
+return
+end
+if C.TriedWords[
+word
+]
+or C.UsedWords[
+word
+]
+or C.DeniedWords[
+word
+] then
+C.Busy =
+false
+return
+end
+C.PendingWord =
+word
+C.ExpectedWord =
+searchPrefix
+setPrefix(
+required
+)
+setWord(
+string.upper(word)
+.. "  ["
+.. source
+.. "]"
+)
+if safe then
+setMode(
+"SAFE • prioridad aceptación"
+)
+else
+setMode(
+"STRATEGY • "
+.. tostring(
+math.round(
+difficulty or 0
+)
+)
+)
+end
+setStatus(
+retry
+and "Retry rápido..."
+or "Escribiendo..."
+)
+print("")
+print(
+"----------------------------------------"
+)
+print(
+"PREFIX:",
+searchPrefix
+)
+print(
+"TARGET:",
+word
+)
+print(
+"SOURCE:",
+source
+)
+print(
+"SAFE:",
+safe
+)
+local suffix =
+word:sub(
+#searchPrefix + 1
+)
+local expected =
+searchPrefix
+for i = 1,
+#suffix do
+if C.Destroyed
+or not C.Enabled
+or C.RecoveringStrike
+or serial
+~= C.RoundSerial
+or C.BlockedRoundSerial
+== serial
+or not isOurTurn() then
+C.Busy =
+false
+return
+end
+local letter =
+suffix:sub(
+i,
+i
+)
+local sent =
+sendGameKey(
+string.upper(
+letter
+)
+)
+if not sent then
+C.Busy =
+false
+C.PendingWord =
+nil
+setStatus(
+"Error enviando letra"
+)
+return
+end
+expected =
+expected
+.. letter
+C.ExpectedWord =
+expected
+setLocalWord(
+expected
+)
+task.wait(
+keyDelay()
+)
+end
+C.TriedWords[
+word
+] = true
+task.wait(
+submitDelay()
+)
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or C.BlockedRoundSerial
+== serial
+or not isOurTurn() then
+C.Busy =
+false
+return
+end
+C.AwaitingResult =
+true
+C.LastSubmittedWord =
+word
+C.LastSubmittedPrefix =
+required
+C.LastSubmittedSerial =
+serial
+if not submitGameAnswer() then
+C.AwaitingResult =
+false
+C.Busy =
+false
+C.PendingWord =
+nil
+setStatus(
+"Error enviando respuesta"
+)
+return
+end
+setStatus(
+"Enviada: "
+.. string.upper(
+word
+)
+)
+C.Busy =
+false
+end
+local function flushToRequiredPrefix(
+rejectedWord,
+prefix,
+serial
+)
+rejectedWord =
+normalize(
+rejectedWord
+)
+prefix =
+normalize(
+prefix
+)
+local flushAttempts =
+math.max(
+8,
+#rejectedWord + 3
+)
+setStatus(
+"Limpiando buffer..."
+)
+setMode(
+"RECOVERY • backspace oficial"
+)
+for _ = 1,
+flushAttempts do
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or C.BlockedRoundSerial
+== serial
+or not isOurTurn() then
+return false
+end
+sendGameKey(-1)
+task.wait(
+clearDelay()
+)
+end
+C.ExpectedWord =
+prefix
+setLocalWord(
+prefix
+)
+task.wait(
+CLEAR_SETTLE_DELAY
+)
+return true
+end
+local function recoverAfterStrike(
+rejectedWord,
+prefix,
+serial
+)
+if C.RecoveringStrike then
+return
+end
+if C.StrikeCount
+and C.StrikeCount
+>= MAX_STRIKES then
+return
+end
+C.RecoveringStrike =
+true
+C.Busy =
+true
+C.AwaitingResult =
+false
+local cleaned =
+flushToRequiredPrefix(
+rejectedWord,
+prefix,
+serial
+)
+C.PendingWord =
+nil
+C.LastSubmittedWord =
+nil
+C.LastSubmittedPrefix =
+nil
+C.LastSubmittedSerial =
+-1
+C.AwaitingResult =
+false
+C.Busy =
+false
+C.RecoveringStrike =
+false
+if not cleaned then
+setStatus(
+"Recovery cancelado"
+)
+return
+end
+if serial
+~= C.RoundSerial
+or not C.Enabled
+or not isOurTurn()
+or C.BlockedRoundSerial
+== serial then
+return
+end
+if C.StrikeCount
+and C.StrikeCount
+>= MAX_STRIKES then
+return
+end
+setStatus(
+"Buffer limpio • siguiente intento"
+)
+task.wait(
+RNG:NextNumber(
+0.045,
+0.080
+)
+)
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or not isOurTurn()
+or C.Busy
+or C.AwaitingResult
+or C.RecoveringStrike then
+return
+end
+task.spawn(function()
+answerPrefix(
+prefix,
+serial,
+true,
+true
+)
+end)
+end
+local function extractChoiceLetter(choice)
+local value =
+choice
+if type(choice)
+== "table" then
+value =
+choice.Choice
+or choice.choice
+or choice.Letter
+or choice.letter
+or choice.Value
+or choice.value
+or choice[1]
+end
+value =
+normalize(
+tostring(
+value or ""
+)
+)
+if value == "" then
+return nil
+end
+return value:sub(
+1,
+1
+)
+end
+local function countCommonContinuations(prefix)
+prefix =
+normalize(prefix)
+local list
+if #prefix >= 2 then
+list =
+C.CommonBuckets2[
+prefix:sub(
+1,
+2
+)
+]
+elseif #prefix == 1 then
+list =
+C.CommonBuckets1[
+prefix
+]
+else
+list =
+C.CommonWords
+end
+if not list then
+return 0
+end
+local count = 0
+for _, word in ipairs(
+list
+) do
+if startsWith(
+word,
+prefix
+) then
+count += 1
+if count
+>= CONTINUATION_CAP then
+break
+end
+end
+end
+return count
+end
+local function letterDifficulty(letter)
+letter =
+normalize(letter)
+if letter == "" then
+return -math.huge
+end
+local score =
+HARD_ENDING_SCORE[
+letter
+]
+or 0
+local count
+if C.Bank then
+count =
+countBankContinuations(
+letter
+)
+else
+count =
+countCommonContinuations(
+letter
+)
+end
+score +=
+scarcityScore(
+count
+)
+if not C.Bank
+and count == 0 then
+score -= 45
+end
+return score
+end
+local function chooseBestLetter(choices)
+if type(choices)
+~= "table" then
+return nil, nil
+end
+local bestLetter = nil
+local bestScore =
+-math.huge
+for _, choice in ipairs(
+choices
+) do
+local letter =
+extractChoiceLetter(
+choice
+)
+if letter then
+local score =
+letterDifficulty(
+letter
+)
+if score > bestScore then
+bestScore =
+score
+bestLetter =
+letter
+end
+end
+end
+return bestLetter,
+bestScore
+end
+local function autoChooseLetter(
+choices,
+serial
+)
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or not isOurTurn() then
+return
+end
+if C.LastChoiceRound
+== serial then
+return
+end
+C.LastChoiceRound =
+serial
+task.wait(
+startDelay(false)
+)
+if C.Destroyed
+or not C.Enabled
+or serial
+~= C.RoundSerial
+or not isOurTurn() then
+return
+end
+local letter,
+difficulty =
+chooseBestLetter(
+choices
+)
+if not letter then
+setStatus(
+"No pude elegir letra"
+)
+C.LastChoiceRound =
+-1
+return
+end
+setPrefix(
+"CHOICE"
+)
+setWord(
+string.upper(
+letter
+)
+)
+setMode(
+"CHOICE • dificultad "
+.. tostring(
+math.round(
+difficulty or 0
+)
+)
+)
+setStatus(
+"Eligiendo "
+.. string.upper(
+letter
+)
+)
+if not chooseGameLetter(
+letter
+) then
+C.LastChoiceRound =
+-1
+setStatus(
+"Error eligiendo letra"
+)
+end
+end
+local function scheduleCurrentRound()
+if C.Destroyed
+or not C.Enabled
+or not isOurTurn() then
+return
+end
+local serial =
+C.RoundSerial
+if C.BlockedRoundSerial
+== serial then
+return
+end
+if C.Choices then
+if C.LastChoiceRound
+== serial then
+return
+end
+task.spawn(function()
+autoChooseLetter(
+C.Choices,
+serial
+)
+end)
+return
+end
+if C.LastStartedRound
+== serial then
+return
+end
+local prefix =
+normalize(
+C.RequiredPrefix
+)
+if prefix == "" then
+return
+end
+C.LastStartedRound =
+serial
+task.spawn(function()
+answerPrefix(
+prefix,
+serial,
+C.Forc
