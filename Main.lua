@@ -70,14 +70,15 @@ local source =
     table.concat(chunks)
 
 ----------------------------------------------------------------
--- FAST HUMAN TIMING PROFILE
--- Mantiene un ritmo rápido pero plausible sin añadir lógica de
--- evasión/anti-cheat, errores falsos ni patrones de ocultación.
+-- FAST TYPING / TURN PACING PROFILE
+-- Añade margen al comienzo del turno para que la respuesta no
+-- arranque de forma instantánea. El ritmo de teclas sigue rápido.
+-- No añade lógica de evasión/anti-cheat ni errores falsos.
 ----------------------------------------------------------------
 
 local timingReplacements = {
-    { "local START_DELAY_MIN = 0.055", "local START_DELAY_MIN = 0.180" },
-    { "local START_DELAY_MAX = 0.105", "local START_DELAY_MAX = 0.320" },
+    { "local START_DELAY_MIN = 0.055", "local START_DELAY_MIN = 0.420" },
+    { "local START_DELAY_MAX = 0.105", "local START_DELAY_MAX = 0.780" },
     { "local RETRY_START_DELAY_MIN = 0.025", "local RETRY_START_DELAY_MIN = 0.140" },
     { "local RETRY_START_DELAY_MAX = 0.055", "local RETRY_START_DELAY_MAX = 0.240" },
     { "local MIN_KEY_DELAY = 0.038", "local MIN_KEY_DELAY = 0.070" },
